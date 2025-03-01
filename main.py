@@ -4,8 +4,10 @@ import requests
 app = FastAPI()
 transitland_api_key = "9LmEldNXzFA6Z0YnclJCOtZLALm77L7q"
 
-@app.get("/combinedStops")
-async def get_combined_stops(lat: float, lon: float, radius: int, route_type: int):
+# https://shiny-rotary-phone-gjw45j64799h95jg-8000.app.github.dev/stopsWithArrivals?lat=53.45355045&lon=-113.59592569403735&radius=2000&route_type=3
+
+@app.get("/times")
+async def get_stops_with_arrivals(lat: float, lon: float, radius: int, route_type: int):
     headers = {"apikey": transitland_api_key}
 
     # Fetch stops
@@ -19,7 +21,6 @@ async def get_combined_stops(lat: float, lon: float, radius: int, route_type: in
     except Exception:
         return {"error": "Failed to parse stops response"}
 
-    # Ensure 'stops' key exists
     if "stops" not in stops_response:
         return {"error": "Invalid stops response", "response": stops_response}
 
@@ -35,38 +36,45 @@ async def get_combined_stops(lat: float, lon: float, radius: int, route_type: in
 
         # Fetch departures for this stop
         depart_res = requests.get(f'https://transit.land/api/v2/rest/stops/{stop_id}/departures', headers=headers)
-        
+
         try:
             depart_response = depart_res.json()
         except Exception:
-            arrival_time = "N/A"
+            departures = []
         else:
+            departures = []
             if "stops" in depart_response and depart_response["stops"]:
                 first_stop = depart_response["stops"][0]
                 if "departures" in first_stop and first_stop["departures"]:
-                    first_departure = first_stop["departures"][0]
-                    arrival_time = first_departure.get("arrival_time", "N/A")
-                else:
-                    arrival_time = "N/A"
-            else:
-                arrival_time = "N/A"
+                    for departure in first_stop["departures"]:
+                        route_info = departure.get("trip", {}).get("route", {})
+                        route_short_name = route_info.get("route_short_name", "Unknown Route")
+                        route_long_name = route_info.get("route_long_name", "Unknown Route Name")
+                        arrival_time = departure.get("arrival_time", "N/A")
 
-        # Append stop data with first arrival time
+                        departures.append({
+                            "route_short_name": route_short_name,
+                            "route_long_name": route_long_name,
+                            "arrival_time": arrival_time
+                        })
+
+        # Group arrivals by route
+        routes_data = {}
+        for dep in departures:
+            route_key = f"{dep['route_short_name']} - {dep['route_long_name']}"
+            if route_key not in routes_data:
+                routes_data[route_key] = []
+            routes_data[route_key].append(dep["arrival_time"])
+
+        # Convert routes_data into a list format
+        routes_list = [{"route_short_name": key.split(" - ")[0], "route_long_name": key.split(" - ")[1], "arrival_times": times} for key, times in routes_data.items()]
+
+        # Append stop data with arrival times per route
         combined_data.append({
             "id": stop_id,
             "name": stop_name,
             "coordinates": coordinates,
-            "first_arrival_time": arrival_time
+            "routes": routes_list
         })
 
     return {"stops": combined_data}
-
-
-
-@app.get("/routes")
-async def getActualStops(lat, long,radius):
-    headers = {"apikey": transitland_api_key}
-
-    res = requests.get(f'https://transit.land/api/v2/rest/routes/?lat={lat}&lon={long}&radius={radius}&route_type={route_type}', headers=headers)
-    response = res.json()
-    return response
