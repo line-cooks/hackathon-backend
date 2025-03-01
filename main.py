@@ -4,7 +4,6 @@ import requests
 app = FastAPI()
 transitland_api_key = "9LmEldNXzFA6Z0YnclJCOtZLALm77L7q"
 
-# https://shiny-rotary-phone-gjw45j64799h95jg-8000.app.github.dev/stopsWithArrivals?lat=53.45355045&lon=-113.59592569403735&radius=2000&route_type=3
 
 @app.get("/times")
 async def get_stops_with_arrivals(lat: float, lon: float, radius: int, route_type: int):
