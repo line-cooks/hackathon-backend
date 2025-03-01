@@ -60,13 +60,3 @@ async def get_combined_stops(lat: float, lon: float, radius: int, route_type: in
         })
 
     return {"stops": combined_data}
-
-
-
-@app.get("/routes")
-async def getActualStops(lat, long,radius):
-    headers = {"apikey": transitland_api_key}
-
-    res = requests.get(f'https://transit.land/api/v2/rest/routes/?lat={lat}&lon={long}&radius={radius}&route_type={route_type}', headers=headers)
-    response = res.json()
-    return response
